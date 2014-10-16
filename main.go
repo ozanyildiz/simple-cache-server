@@ -3,7 +3,14 @@ package main
 import (
 	"log"
 	"net"
+	"strings"
 )
+
+var cache = make(map[string]string)
+
+// Commands
+var GET string = "get"
+var SET string = "set"
 
 func main() {
 	ln, err := net.Listen("tcp", ":8080")
@@ -30,9 +37,23 @@ func handleConnection(c net.Conn) {
 			break
 		}
 		n, err = c.Write(buf[0:n])
+
 		if err != nil {
 			c.Close()
 			break
+		}
+
+		commandPieces := strings.Split(string(buf[0:n]), " ")
+		log.Printf("%s", commandPieces)
+		command := commandPieces[0]
+		if command == GET {
+			key := commandPieces[1]
+			log.Printf("Get command. cache[%s] = %s", key, cache[key])
+		} else if command == SET {
+			key := commandPieces[1]
+			value := commandPieces[2]
+			cache[key] = value
+			log.Printf("Set command. cache[%s] = %s", key, cache[key])
 		}
 	}
 	log.Printf("Connection from %v closed.", c.RemoteAddr())
