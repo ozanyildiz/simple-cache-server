@@ -11,6 +11,7 @@ var cache = make(map[string]string)
 // Commands
 var GET string = "get"
 var SET string = "set"
+var DELETE string = "delete"
 
 var LINE_ENDING = "\r\n"
 
@@ -69,6 +70,14 @@ func handleConnection(c net.Conn) {
 			log.Printf("Set command. cache[%s] = %s", key, cache[key])
 			isExpectingCommand = true
 			currentKey = key
+		} else if command == DELETE {
+			key := commandPieces[1]
+			_, exists := cache[key]
+			if exists {
+				delete(cache, key)
+			} else {
+				// error handling
+			}
 		}
 	}
 	log.Printf("Connection from %v closed.", c.RemoteAddr())
