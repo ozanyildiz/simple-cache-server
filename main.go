@@ -12,6 +12,8 @@ var cache = make(map[string]string)
 var GET string = "get"
 var SET string = "set"
 
+var LINE_ENDING = "\r\n"
+
 func main() {
 	ln, err := net.Listen("tcp", ":8080")
 	if err != nil {
@@ -43,7 +45,8 @@ func handleConnection(c net.Conn) {
 			break
 		}
 
-		commandPieces := strings.Split(string(buf[0:n]), " ")
+		message := strings.TrimSuffix(string(buf[0:n]), LINE_ENDING)
+		commandPieces := strings.Split(message, " ")
 		log.Printf("%s", commandPieces)
 		command := commandPieces[0]
 		if command == GET {
