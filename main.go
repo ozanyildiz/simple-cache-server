@@ -32,6 +32,9 @@ func main() {
 
 func handleConnection(c net.Conn) {
 	buf := make([]byte, 4096)
+	isExpectingCommand := false
+	currentKey := ""
+
 	for {
 		n, err := c.Read(buf)
 		if err != nil || n == 0 {
@@ -46,17 +49,26 @@ func handleConnection(c net.Conn) {
 		}
 
 		message := strings.TrimSuffix(string(buf[0:n]), LINE_ENDING)
+
+		if isExpectingCommand {
+			log.Printf("Expecting command")
+			cache[currentKey] = message
+			isExpectingCommand = false
+			continue
+		}
+
 		commandPieces := strings.Split(message, " ")
 		log.Printf("%s", commandPieces)
 		command := commandPieces[0]
+
 		if command == GET {
 			key := commandPieces[1]
 			log.Printf("Get command. cache[%s] = %s", key, cache[key])
 		} else if command == SET {
 			key := commandPieces[1]
-			value := commandPieces[2]
-			cache[key] = value
 			log.Printf("Set command. cache[%s] = %s", key, cache[key])
+			isExpectingCommand = true
+			currentKey = key
 		}
 	}
 	log.Printf("Connection from %v closed.", c.RemoteAddr())
