@@ -15,6 +15,12 @@ var DELETE string = "delete"
 
 var LINE_ENDING = "\r\n"
 
+// Responses
+var VALUE string = "VALUE"
+var END string = "END"
+var STORED string = "STORED"
+var DELETED string = "DELETED"
+
 func main() {
 	ln, err := net.Listen("tcp", ":8080")
 	if err != nil {
@@ -52,9 +58,9 @@ func handleConnection(c net.Conn) {
 		message := strings.TrimSuffix(string(buf[0:n]), LINE_ENDING)
 
 		if isExpectingCommand {
-			log.Printf("Expecting command")
 			cache[currentKey] = message
 			isExpectingCommand = false
+			c.Write([]byte(STORED + LINE_ENDING))
 			continue
 		}
 
@@ -63,20 +69,23 @@ func handleConnection(c net.Conn) {
 		command := commandPieces[0]
 
 		if command == GET {
-			key := commandPieces[1]
-			log.Printf("Get command. cache[%s] = %s", key, cache[key])
+			response := VALUE
+			for i := range commandPieces[1:] {
+				key := commandPieces[i+1]
+				response += key + LINE_ENDING + cache[key] + LINE_ENDING
+			}
+			response += END + LINE_ENDING
+			c.Write([]byte(response))
 		} else if command == SET {
-			key := commandPieces[1]
-			log.Printf("Set command. cache[%s] = %s", key, cache[key])
+			currentKey = commandPieces[1]
 			isExpectingCommand = true
-			currentKey = key
 		} else if command == DELETE {
 			key := commandPieces[1]
 			_, exists := cache[key]
 			if exists {
 				delete(cache, key)
 			} else {
-				// error handling
+				c.Write([]byte(DELETED + LINE_ENDING))
 			}
 		}
 	}
