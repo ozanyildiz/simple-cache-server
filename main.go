@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net"
 	"strconv"
@@ -30,11 +31,15 @@ var DATA_LIMIT int = 8192 // 8kb
 var LINE_ENDING = "\r\n"
 
 // Options
-var DAFAULT_PORT int = 11212
+var DEFAULT_PORT int = 11212
 var DEFAULT_ITEMS int = 65535
 
 func main() {
-	ln, err := net.Listen("tcp", ":8080")
+	port := flag.Int("port", DEFAULT_PORT, "The port the server listens on")
+	items := flag.Int("item", DEFAULT_ITEMS, "Total number of items the server can store")
+	flag.Parse()
+
+	ln, err := net.Listen("tcp", ":"+strconv.Itoa(*port))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,12 +50,12 @@ func main() {
 			log.Fatal(err)
 			continue
 		}
-		go handleConnection(conn)
+		go handleConnection(conn, *items)
 	}
 }
 
-func handleConnection(c net.Conn) {
-	buf := make([]byte, DATA_LIMIT)
+func handleConnection(c net.Conn, items int) {
+	buf := make([]byte, items)
 	isExpectingCommand := false
 	currentKey := ""
 
