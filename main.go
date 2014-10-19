@@ -7,7 +7,8 @@ import (
 	"strings"
 )
 
-var cache = make(map[string]string)
+// Global variables
+var CACHE = make(map[string]string)
 
 // Commands
 var GET string = "get"
@@ -16,25 +17,32 @@ var DELETE string = "delete"
 var QUIT string = "quit"
 var STATS string = "stats"
 
-var LINE_ENDING = "\r\n"
-
 // Responses
 var VALUE string = "VALUE"
 var END string = "END"
 var STORED string = "STORED"
 var DELETED string = "DELETED"
 var NOT_FOUND string = "NOT_FOUND"
+var ERROR string = "ERROR"
+
+var KEY_LIMIT int = 255   // # of characters
+var DATA_LIMIT int = 8192 // 8kb
+var LINE_ENDING = "\r\n"
+
+// Options
+var DAFAULT_PORT int = 11212
+var DEFAULT_ITEMS int = 65535
 
 func main() {
 	ln, err := net.Listen("tcp", ":8080")
 	if err != nil {
-		// error handling
+		log.Fatal(err)
 	}
 
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			// error handling
+			log.Fatal(err)
 			continue
 		}
 		go handleConnection(conn)
@@ -42,7 +50,7 @@ func main() {
 }
 
 func handleConnection(c net.Conn) {
-	buf := make([]byte, 4096)
+	buf := make([]byte, DATA_LIMIT)
 	isExpectingCommand := false
 	currentKey := ""
 
@@ -63,27 +71,26 @@ func handleConnection(c net.Conn) {
 		message := strings.TrimSuffix(string(buf[0:n]), LINE_ENDING)
 
 		if isExpectingCommand {
-			cache[currentKey] = message
+			CACHE[currentKey] = message
 			isExpectingCommand = false
 			c.Write([]byte(STORED + LINE_ENDING))
 			continue
 		}
 
 		commandPieces := strings.Split(message, " ")
-		log.Printf("%s", commandPieces)
 		command := commandPieces[0]
 
 		if command == GET {
 			response := ""
 			for i := range commandPieces[1:] {
 				key := commandPieces[i+1]
-				_, exists := cache[key]
+				_, exists := CACHE[key]
 				if exists {
 					response += VALUE + " " + key + LINE_ENDING
-					response += cache[key] + LINE_ENDING
+					response += CACHE[key] + LINE_ENDING
 					stats["get_hits"] += 1
 				} else {
-					stats["get_misses"] += 1
+					stats["get_msses"] += 1
 				}
 				stats["cmd_get"] += 1
 			}
@@ -91,13 +98,17 @@ func handleConnection(c net.Conn) {
 			c.Write([]byte(response))
 		} else if command == SET {
 			currentKey = commandPieces[1]
+			if len(currentKey) >= KEY_LIMIT {
+				c.Write([]byte(ERROR + LINE_ENDING))
+				continue
+			}
 			isExpectingCommand = true
 			stats["cmd_set"] += 1
 		} else if command == DELETE {
 			key := commandPieces[1]
-			_, exists := cache[key]
+			_, exists := CACHE[key]
 			if exists {
-				delete(cache, key)
+				delete(CACHE, key)
 				c.Write([]byte(DELETED + LINE_ENDING))
 				stats["delete_hits"] += 1
 			} else {
@@ -111,15 +122,17 @@ func handleConnection(c net.Conn) {
 			response += "get_misses " + strconv.Itoa(stats["get_misses"]) + LINE_ENDING
 			response += "delete_hits " + strconv.Itoa(stats["delete_hits"]) + LINE_ENDING
 			response += "delete_misses " + strconv.Itoa(stats["delete_misses"]) + LINE_ENDING
-			response += "curr_items " + strconv.Itoa(len(cache)) + LINE_ENDING
-			response += "limits_items " + "not implemented" + LINE_ENDING
+			response += "curr_items " + strconv.Itoa(len(CACHE)) + LINE_ENDING
+			response += "limits_items " + strconv.Itoa(DEFAULT_ITEMS) + LINE_ENDING
 			response += END + LINE_ENDING
 			c.Write([]byte(response))
 		} else if command == QUIT {
 			err = c.Close()
 			if err != nil {
-				// error handling
+				log.Fatal(err)
 			}
+		} else {
+			c.Write([]byte(ERROR + " NO CAMMAND FOUND" + LINE_ENDING))
 		}
 	}
 	log.Printf("Connection from %v closed.", c.RemoteAddr())
