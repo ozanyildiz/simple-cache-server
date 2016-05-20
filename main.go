@@ -117,7 +117,7 @@ func handleConnection(c net.Conn, items int) {
 				c.Write([]byte(DELETED + LINE_ENDING))
 				stats["delete_hits"] += 1
 			} else {
-				c.Write([]byte(NOT_FOUND))
+				c.Write([]byte(NOT_FOUND + LINE_ENDING))
 				stats["delete_misses"] += 1
 			}
 		} else if command == STATS {
